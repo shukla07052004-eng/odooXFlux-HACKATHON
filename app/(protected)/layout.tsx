@@ -1,10 +1,11 @@
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ProtectedShell } from "@/components/layout/protected-shell";
+import { getSessionUser } from "@/lib/auth/session";
+
+export const instant = false;
 
 export default async function ProtectedLayout({ children }: { children: React.ReactNode }) {
-  const cookieStore = await cookies();
-  // This is a workspace UI guard; API handlers must authorize every request independently.
-  if (!cookieStore.has("accessToken")) redirect("/sign-up");
-  return <ProtectedShell>{children}</ProtectedShell>;
+  const user = await getSessionUser();
+  if (!user) redirect("/sign-in");
+  return <ProtectedShell user={user}>{children}</ProtectedShell>;
 }

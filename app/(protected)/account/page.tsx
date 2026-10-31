@@ -1,0 +1,18 @@
+'use client';
+
+import { useEffect, useState } from "react";
+import { AlertCircle, RefreshCw } from "lucide-react";
+import { formatCurrency, formatDate } from "@/lib/format";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { PageHeader } from "@/components/ui/page-header";
+
+type Row = { id: string; [key: string]: unknown };
+type AccountData = { user: { name: string; email: string }; subscriptions: Row[]; invoices: Row[] };
+export default function AccountPage() {
+  const [data, setData] = useState<AccountData | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState(""); const [reload, setReload] = useState(0);
+  useEffect(() => { const controller = new AbortController(); const timer = window.setTimeout(() => { void (async () => { setLoading(true); setError(""); try { const response = await fetch("/api/account", { cache: "no-store", signal: controller.signal }); const result = await response.json() as AccountData & { message?: string }; if (!response.ok) throw new Error(result.message ?? `Account endpoint returned ${response.status}.`); setData(result); } catch (reason) { if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : "Unable to load your account."); } finally { if (!controller.signal.aborted) setLoading(false); } })(); }, 0); return () => { window.clearTimeout(timer); controller.abort(); }; }, [reload]);
+  return <><PageHeader eyebrow="CUSTOMER PORTAL" title="My account" description="Review your subscriptions, invoices, and payment balances." action={<button onClick={() => setReload((value) => value + 1)} className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm"><RefreshCw className="h-4 w-4"/>Refresh</button>}/>{error && <div role="alert" className="mb-4 flex gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"><AlertCircle className="h-4 w-4"/>{error}</div>}
+    <section className="mb-5 rounded-xl border border-slate-200 bg-white p-5"><p className="text-xs uppercase tracking-wide text-slate-500">Account profile</p><h2 className="mt-2 text-lg font-semibold">{data?.user.name ?? (loading ? "Loading…" : "Customer")}</h2><p className="mt-1 text-sm text-slate-500">{data?.user.email ?? ""}</p></section>
+    <div className="grid gap-5 xl:grid-cols-2">{[{ title: "Subscriptions", rows: data?.subscriptions ?? [], ref: "subscription_number", date: "expiry_date", amount: "", empty: "No subscriptions are associated with your account." }, { title: "Invoices", rows: data?.invoices ?? [], ref: "invoice_number", date: "due_date", amount: "total_amount", empty: "No invoices are associated with your account." }].map((section) => <section key={section.title} className="overflow-hidden rounded-xl border border-slate-200 bg-white"><header className="border-b border-slate-100 px-5 py-4"><h2 className="text-sm font-semibold">{section.title}</h2></header>{loading ? <p className="p-5 text-sm text-slate-500">Loading…</p> : section.rows.length ? <div className="divide-y divide-slate-100">{section.rows.map((row) => <article key={row.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"><div><b className="text-sm">{String(row[section.ref] ?? row.id)}</b><p className="mt-1 text-xs text-slate-500">{section.title === "Subscriptions" ? String(row.plan_name ?? "Plan") : "Due"} · {formatDate(row[section.date])}</p></div><div className="flex items-center gap-3">{section.amount && <b className="text-sm">{formatCurrency(row[section.amount])}</b>}<StatusBadge status={String(row.status ?? "Unknown")}/></div></article>)}</div> : <p className="p-8 text-center text-sm text-slate-500">{section.empty}</p>}</section>)}</div>
+  </>;
+}
