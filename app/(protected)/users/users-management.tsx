@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Search, UserPlus, RefreshCw, Eye, Pencil, UserCheck, UserX, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, UserPlus, RefreshCw, Eye, Pencil, UserCheck, UserX, X, ChevronLeft, ChevronRight, Copy, Check } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { ErrorState } from "@/components/ui/error-state";
 import { formatDate } from "@/lib/format";
@@ -21,6 +21,7 @@ type ManagedUser = {
 };
 type UserStats = { total_users: number; total_admins: number; total_staff: number; total_customers: number; active_users: number; inactive_users: number };
 type UserForm = { name: string; email: string; password: string; phone: string; company: string; address: string; role: "staff" | "customer" };
+type CreatedCredentials = Pick<UserForm, "name" | "email" | "password" | "role">;
 type UserResponse = { success?: boolean; message?: string; data?: ManagedUser };
 type ListResponse = { success: boolean; data: ManagedUser[]; stats: UserStats; pagination: { page: number; pageSize: number; total: number; totalPages: number }; message?: string };
 
@@ -41,9 +42,11 @@ export default function UsersManagement() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [dialog, setDialog] = useState<"new" | "edit" | "view" | null>(null);
+  const [dialog, setDialog] = useState<"new" | "edit" | "view" | "credentials" | null>(null);
   const [selected, setSelected] = useState<ManagedUser | null>(null);
   const [form, setForm] = useState<UserForm>(emptyForm);
+  const [createdCredentials, setCreatedCredentials] = useState<CreatedCredentials | null>(null);
+  const [copiedCredentials, setCopiedCredentials] = useState(false);
   const [reload, setReload] = useState(0);
 
   const loadUsers = useCallback(async (signal: AbortSignal) => {
@@ -73,9 +76,33 @@ export default function UsersManagement() {
 
   function openNew() {
     setSelected(null);
+    setCreatedCredentials(null);
+    setCopiedCredentials(false);
     setForm(emptyForm);
     setDialog("new");
     setError("");
+  }
+
+  function closeDialog() {
+    if (dialog === "credentials") {
+      setCreatedCredentials(null);
+      setCopiedCredentials(false);
+      setForm(emptyForm);
+      setError("");
+      setNotice("Account created. Its initial password was only shown once.");
+    }
+    setDialog(null);
+  }
+
+  async function copyCredentials() {
+    if (!createdCredentials) return;
+    try {
+      await navigator.clipboard.writeText(`Email: ${createdCredentials.email}\nPassword: ${createdCredentials.password}`);
+      setCopiedCredentials(true);
+      setError("");
+    } catch {
+      setError("Clipboard access was blocked. Select and copy the email and password below.");
+    }
   }
 
   async function openDetails(user: ManagedUser) {
@@ -111,9 +138,17 @@ export default function UsersManagement() {
       });
       const result = await response.json() as UserResponse;
       if (!response.ok || !result.success) throw new Error(result.message ?? `Save failed (${response.status}).`);
-      setDialog(null);
+      if (editing) {
+        setDialog(null);
+        setNotice(result.message ?? "User updated.");
+      } else {
+        setCreatedCredentials({ name: form.name, email: form.email.trim().toLowerCase(), password: form.password, role: form.role });
+        setCopiedCredentials(false);
+        setDialog("credentials");
+        setNotice("");
+      }
       setSelected(null);
-      setNotice(result.message ?? (editing ? "User updated." : "Account created."));
+      setForm(emptyForm);
       setReload((value) => value + 1);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Unable to save user.");
@@ -431,7 +466,7 @@ export default function UsersManagement() {
         className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/35 p-4"
         onMouseDown={(event) => {
           if (event.target === event.currentTarget) {
-            setDialog(null);
+            closeDialog();
           }
         }}
       >
@@ -454,7 +489,7 @@ export default function UsersManagement() {
 
             <button
               type="button"
-              onClick={() => setDialog(null)}
+              onClick={closeDialog}
               aria-label="Close dialog"
               className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100"
             >
@@ -626,7 +661,7 @@ export default function UsersManagement() {
             <footer className="flex justify-end gap-2 border-t border-slate-100 pt-4">
               <button
                 type="button"
-                onClick={() => setDialog(null)}
+                onClick={closeDialog}
                 className="h-9 rounded-md border border-slate-200 px-3 text-sm"
               >
                 Cancel
@@ -649,7 +684,7 @@ export default function UsersManagement() {
         className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/35 p-4"
         onMouseDown={(event) => {
           if (event.target === event.currentTarget) {
-            setDialog(null);
+            closeDialog();
           }
         }}
       >
@@ -672,7 +707,7 @@ export default function UsersManagement() {
 
             <button
               type="button"
-              onClick={() => setDialog(null)}
+              onClick={closeDialog}
               aria-label="Close details"
               className="rounded p-1 text-slate-500 hover:bg-slate-100"
             >
@@ -706,10 +741,57 @@ export default function UsersManagement() {
           <footer className="mt-6 flex justify-end">
             <button
               type="button"
-              onClick={() => setDialog(null)}
+              onClick={closeDialog}
               className="h-9 rounded-md border border-slate-200 px-3 text-sm"
             >
               Close
+            </button>
+          </footer>
+        </section>
+      </div>
+    )}
+
+    {dialog === "credentials" && createdCredentials && (
+      <div
+        className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/35 p-4"
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) closeDialog();
+        }}
+      >
+        <section
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="created-credentials-title"
+          className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-6 shadow-2xl"
+        >
+          <header>
+            <p className="text-[10px] font-semibold tracking-[.12em] text-emerald-700">ACCOUNT CREATED</p>
+            <h2 id="created-credentials-title" className="mt-1 text-xl font-semibold text-slate-900">
+              {createdCredentials.role === "staff" ? "Staff" : "Customer"} sign-in details
+            </h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Give these credentials to {createdCredentials.name}. The password is shown only now and cannot be retrieved after closing.
+            </p>
+          </header>
+
+          <div className="mt-5 grid gap-4">
+            <label className="grid gap-1.5 text-xs font-medium text-slate-600">
+              Email / User ID
+              <input readOnly value={createdCredentials.email} onFocus={(event) => event.currentTarget.select()} className="h-10 rounded-md border border-slate-200 bg-slate-50 px-3 font-mono text-sm text-slate-900" />
+            </label>
+            <label className="grid gap-1.5 text-xs font-medium text-slate-600">
+              Initial password
+              <input readOnly value={createdCredentials.password} onFocus={(event) => event.currentTarget.select()} className="h-10 rounded-md border border-slate-200 bg-slate-50 px-3 font-mono text-sm text-slate-900" />
+            </label>
+          </div>
+
+          {error && <p role="alert" className="mt-4 text-sm text-rose-700">{error}</p>}
+
+          <footer className="mt-6 flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end">
+            <button type="button" onClick={closeDialog} className="h-9 rounded-md border border-slate-200 px-3 text-sm">Done</button>
+            <button type="button" onClick={() => void copyCredentials()} className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-indigo-600 px-3 text-sm font-semibold text-white hover:bg-indigo-700">
+              {copiedCredentials ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              {copiedCredentials ? "Copied credentials" : "Copy credentials"}
             </button>
           </footer>
         </section>
