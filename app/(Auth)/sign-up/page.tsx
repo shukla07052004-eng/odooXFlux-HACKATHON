@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -13,8 +12,6 @@ import { StarsBackground } from "@/components/customCss/stars-background";
 import AuthCard from "@/styles/AuthCard";
 import { LayoutTextFlip } from "@/components/customCss/layout-text-flip";
 import { motion } from "motion/react";
-
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 interface SignupResponse {
     success: boolean;
@@ -31,32 +28,7 @@ export default function SignupForm() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    async function checkUsername() {
-        try {
-            const res = await fetch("/api/unique-username-cheque", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ username }),
-            });
-
-            const data: SignupResponse = await res.json();
-
-            if (!res.ok || !data.success) {
-                setError(data.message || "Username is Already Taken. Please try With different one");
-                setIsLoading(false);
-                return;
-            }
-
-        } catch (error) {
-            setError("Could not reach the server. Please check your connection.");
-            setIsLoading(false);
-        }
-    }
-
-
-
-
-    async function handleSubmit(e: any) {
+    async function handleSubmit(e: FormEvent<HTMLFormElement>) {
         e.preventDefault();
         setError(null);
 
@@ -66,7 +38,7 @@ export default function SignupForm() {
             const res = await fetch("/api/signup", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ username, email, password }),
+                body: JSON.stringify({ name: username, email: email.trim().toLowerCase(), password }),
             });
 
             const data: SignupResponse = await res.json();
@@ -78,9 +50,10 @@ export default function SignupForm() {
             }
 
             // Send the email along so the user doesn't have to retype it on /verify.
-            router.push(`/verify?email=${encodeURIComponent(email)}`);
-        } catch {
-            setError("Could not reach the server. Please check your connection.");
+            router.push(`/verify?email=${encodeURIComponent(email.trim().toLowerCase())}`);
+        } catch (reason) {
+            setError(reason instanceof Error ? reason.message : "Could not reach the server. Please check your connection.");
+        } finally {
             setIsLoading(false);
         }
     }
@@ -113,18 +86,19 @@ export default function SignupForm() {
                                     type="text"
                                     value={username}
                                     onChange={(e) => setUsername(e.target.value)}
-                                    onBlur={checkUsername}
                                     placeholder="Username"
                                     disabled={isLoading}
                                     autoComplete="username"
                                     required />
                                 <Input id="email" placeholder="Email Address" type="email"
+                                    value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     disabled={isLoading}
                                     autoComplete="email"
                                     required
                                 />
                                 <Input id="password" placeholder="Password" type="password"
+                                    value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     disabled={isLoading}
                                     autoComplete="new-password"
@@ -133,8 +107,9 @@ export default function SignupForm() {
                                 <button
                                     className="group/btn relative cursor-pointer block h-10 w-full ounded-md bg-gradient-to-br from-black to-neutral-600 font-medium text-white shadow-[0px_1px_0px_0px_#ffffff40_inset,0px_-1px_0px_0px_#ffffff40_inset] dark:bg-zinc-800 dark:from-zinc-900 dark:to-zinc-900 dark:shadow-[0px_1px_0px_0px_#27272a_inset,0px_-1px_0px_0px_#27272a_inset]"
                                     type="submit"
+                                    disabled={isLoading}
                                 >
-                                    Sign up &rarr;
+                                    {isLoading ? "Creating account…" : "Sign up →"}
                                     <BottomGradient />
                                 </button>
                             </LabelInputContainer>

@@ -9,7 +9,7 @@ async function createAdmin() {
     await ensureDatabaseReady();
 
     const name = "System Admin";
-    const email = process.env.ADMIN_EMAIL;
+    const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
     const password = process.env.ADMIN_PASSWORD;
 
     if (!email || !password) {
@@ -33,8 +33,8 @@ async function createAdmin() {
     // Insert the first admin
     await pool.query(
       `INSERT INTO users
-       (name, email, password_hash, role)
-       VALUES ($1, $2, $3, 'admin')`,
+       (name, email, password_hash, role, is_active, is_verified)
+       VALUES ($1, $2, $3, 'admin', TRUE, TRUE)`,
       [name, email, passwordHash]
     );
 
