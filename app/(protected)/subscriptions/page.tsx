@@ -20,12 +20,115 @@ export default function SubscriptionsPage() {
   async function remove(row: BillingRecord) { if (!window.confirm(`Delete subscription ${String(row.subscription_number ?? row.id)}?`)) return; try { const response = await fetch(`/api/subscriptions/${encodeURIComponent(row.id)}`, { method: "DELETE" }); if (!response.ok) throw new Error(`Delete failed (${response.status}).`); setNotice("Subscription deleted."); setReload((key) => key + 1); } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to delete subscription."); } }
   async function updateStatus(row: BillingRecord, status: string) { try { const response = await fetch(`/api/subscriptions/${encodeURIComponent(row.id)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }) }); if (!response.ok) throw new Error(`Status update failed (${response.status}).`); setNotice(`Subscription ${status.toLowerCase()}.`); setReload((key) => key + 1); } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to update subscription."); } }
   const value = rows.reduce((sum, row) => sum + Number(row.total_amount ?? 0), 0);
-  return <><PageHeader eyebrow="RECURRING REVENUE" title="Subscriptions" description="Create, renew, pause, activate, and close customer subscriptions." action={<div className="flex gap-2"><button onClick={() => setReload((key) => key + 1)} className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm"><RefreshCw className="h-4 w-4"/>Refresh</button><button onClick={() => setDialog("new")} className="inline-flex h-9 items-center gap-2 rounded-md bg-indigo-600 px-3 text-sm font-semibold text-white"><Plus className="h-4 w-4"/>New subscription</button></div>}/>
-    {notice && <button onClick={() => setNotice("")} className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">{notice} · dismiss</button>}{error && <ErrorState message={error} onRetry={() => setReload((key) => key + 1)}/>}
-    <section className="mb-4 grid gap-3 sm:grid-cols-3">{[{ label: "Active", value: rows.filter((r) => String(r.status).toLowerCase() === "active").length }, { label: "Renewal portfolio", value: formatCurrency(value) }, { label: "Needs attention", value: rows.filter((r) => ["draft", "quotation"].includes(String(r.status).toLowerCase())).length }].map((item) => <article key={item.label} className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">{item.label}</p><b className="mt-2 block text-xl">{loading ? "—" : item.value}</b></article>)}</section>
-    <EntityTable rows={rows} columns={columns} loading={loading} emptyLabel="No subscriptions found. Create one or convert an accepted quotation." onEdit={setDialog} onDelete={remove} onStatusChange={updateStatus} statusOptions={["Draft", "Quotation", "Confirmed", "Active", "Paused", "Closed"]}/>
-    <p className="mt-3 text-xs text-slate-500">Use the Status column for lifecycle actions; renewal and timeline events are stored by the subscriptions API.</p>
-    {dialog && <RecordDialog title={dialog === "new" ? "Create subscription" : "Edit subscription"} fields={fields} initialValues={dialog === "new" ? {} : dialog} onClose={() => setDialog(null)} onSubmit={submit} saving={saving}/>}
-  </>;
+  return <>
+    <PageHeader
+      eyebrow="RECURRING REVENUE"
+      title="Subscriptions"
+      description="Create, renew, pause, activate, and close customer subscriptions."
+      action={
+        <div className="flex gap-2">
+          <button
+            onClick={() => setReload((key) => key + 1)}
+            className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Refresh
+          </button>
+
+          <button
+            onClick={() => setDialog("new")}
+            className="inline-flex h-9 items-center gap-2 rounded-md bg-indigo-600 px-3 text-sm font-semibold text-white"
+          >
+            <Plus className="h-4 w-4" />
+            New subscription
+          </button>
+        </div>
+      }
+    />
+
+    {notice && (
+      <button
+        onClick={() => setNotice("")}
+        className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800"
+      >
+        {notice} · dismiss
+      </button>
+    )}
+
+    {error && (
+      <ErrorState
+        message={error}
+        onRetry={() => setReload((key) => key + 1)}
+      />
+    )}
+
+    <section className="mb-4 grid gap-3 sm:grid-cols-3">
+      {[
+        {
+          label: "Active",
+          value: rows.filter(
+            (r) => String(r.status).toLowerCase() === "active"
+          ).length,
+        },
+        {
+          label: "Renewal portfolio",
+          value: formatCurrency(value),
+        },
+        {
+          label: "Needs attention",
+          value: rows.filter((r) =>
+            ["draft", "quotation"].includes(String(r.status).toLowerCase())
+          ).length,
+        },
+      ].map((item) => (
+        <article
+          key={item.label}
+          className="rounded-xl border border-slate-200 bg-white p-4"
+        >
+          <p className="text-xs text-slate-500">
+            {item.label}
+          </p>
+
+          <b className="mt-2 block text-xl">
+            {loading ? "—" : item.value}
+          </b>
+        </article>
+      ))}
+    </section>
+
+    <EntityTable
+      rows={rows}
+      columns={columns}
+      loading={loading}
+      emptyLabel="No subscriptions found. Create one or convert an accepted quotation."
+      onEdit={setDialog}
+      onDelete={remove}
+      onStatusChange={updateStatus}
+      statusOptions={[
+        "Draft",
+        "Quotation",
+        "Confirmed",
+        "Active",
+        "Paused",
+        "Closed",
+      ]}
+    />
+
+    <p className="mt-3 text-xs text-slate-500">
+      Use the Status column for lifecycle actions; renewal and timeline events
+      are stored by the subscriptions API.
+    </p>
+
+    {dialog && (
+      <RecordDialog
+        title={dialog === "new" ? "Create subscription" : "Edit subscription"}
+        fields={fields}
+        initialValues={dialog === "new" ? {} : dialog}
+        onClose={() => setDialog(null)}
+        onSubmit={submit}
+        saving={saving}
+      />
+    )}
+  </>
 }
 

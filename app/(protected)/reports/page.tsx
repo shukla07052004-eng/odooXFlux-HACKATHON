@@ -17,11 +17,159 @@ export default function ReportsPage() {
   const outstanding = invoices.reduce((sum, row) => sum + Number(row.outstanding_amount ?? Math.max(Number(row.total_amount ?? 0) - Number(row.paid_amount ?? 0), 0)), 0); const revenue = payments.reduce((sum, row) => sum + Number(row.amount ?? 0), 0); const overdue = invoices.filter((row) => String(row.status).toLowerCase() === "overdue");
   function exportPayments() { const lines = [["Payment", "Invoice", "Customer", "Date", "Method", "Amount"], ...payments.map((row) => [row.payment_number, row.invoice_number, row.customer_name, row.payment_date, row.payment_method, row.amount])].map((row) => row.map((cell) => `"${String(cell ?? "").replaceAll('"', '""')}"`).join(",")).join("\n"); const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([lines], { type: "text/csv" })); link.download = "brightloop-payments-report.csv"; link.click(); URL.revokeObjectURL(link.href); }
   const reports = [{ title: "Revenue report", description: "Collected payments over the selected period.", value: formatCurrency(revenue), rows: payments }, { title: "Active subscriptions", description: "Current recurring customer agreements.", value: String(subscriptions.filter((row) => String(row.status).toLowerCase() === "active").length), rows: subscriptions }, { title: "Outstanding invoices", description: "Open invoice balance in the selected period.", value: formatCurrency(outstanding), rows: invoices.filter((row) => Number(row.outstanding_amount ?? 0) > 0) }, { title: "Overdue invoices", description: "Invoices marked overdue by billing operations.", value: String(overdue.length), rows: overdue }, { title: "Payment report", description: "Payment records available for reconciliation.", value: `${payments.length} payments`, rows: payments }];
-  return <><PageHeader eyebrow="ANALYTICS" title="Reports" description="Review billing performance and export filtered payment activity." action={<button onClick={() => setReload((key) => key + 1)} className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm"><RefreshCw className="h-4 w-4"/>Refresh</button>}/>
-    <section className="mb-5 flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4"><label className="grid gap-1 text-xs font-medium text-slate-600">From<input type="date" value={from} onChange={(event) => setFrom(event.target.value)} className="h-9 rounded-md border border-slate-200 px-3 text-sm"/></label><label className="grid gap-1 text-xs font-medium text-slate-600">To<input type="date" value={to} onChange={(event) => setTo(event.target.value)} className="h-9 rounded-md border border-slate-200 px-3 text-sm"/></label><button onClick={() => { setFrom(""); setTo(""); }} className="h-9 rounded-md px-3 text-sm text-slate-600 hover:bg-slate-50">Clear dates</button><button onClick={exportPayments} className="ml-auto inline-flex h-9 items-center gap-2 rounded-md bg-indigo-600 px-3 text-sm font-semibold text-white"><Download className="h-4 w-4"/>Export payments CSV</button></section>
-    {error && <ErrorState message={error} onRetry={() => setReload((key) => key + 1)}/>}
-    <div className="grid gap-4 lg:grid-cols-2">{reports.map((report) => <article key={report.title} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-start justify-between gap-3"><div><h2 className="text-sm font-semibold text-slate-900">{report.title}</h2><p className="mt-1 text-xs text-slate-500">{report.description}</p></div><b className="text-lg tabular-nums text-slate-900">{loading ? "—" : report.value}</b></div><div className="mt-4 border-t border-slate-100 pt-3 text-xs text-slate-500">{loading ? "Loading report…" : `${report.rows.length} records · dates ${from || "any"} to ${to || "today"}`}</div></article>)}</div>
-    <section className="mt-5 overflow-hidden rounded-xl border border-slate-200 bg-white"><header className="border-b border-slate-100 px-5 py-4"><h2 className="text-sm font-semibold">Payment activity</h2><p className="mt-1 text-xs text-slate-500">Filtered payment records</p></header><div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-sm"><thead className="bg-slate-50 text-[11px] uppercase text-slate-500"><tr>{["Payment", "Customer", "Date", "Method", "Amount"].map((name) => <th key={name} className="px-5 py-3">{name}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{payments.slice(0, 8).map((row) => <tr key={row.id}><td className="px-5 py-3">{String(row.payment_number ?? row.id)}</td><td className="px-5 py-3">{String(row.customer_name ?? "—")}</td><td className="px-5 py-3">{formatDate(row.payment_date)}</td><td className="px-5 py-3">{String(row.payment_method ?? "—")}</td><td className="px-5 py-3 font-medium">{formatCurrency(row.amount)}</td></tr>)}</tbody></table>{!loading && !payments.length && <p className="p-8 text-center text-sm text-slate-500">No payment activity in this date range.</p>}</div></section>
-  </>;
+  return <>
+    <PageHeader
+      eyebrow="ANALYTICS"
+      title="Reports"
+      description="Review billing performance and export filtered payment activity."
+      action={
+        <button
+          onClick={() => setReload((key) => key + 1)}
+          className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm"
+        >
+          <RefreshCw className="h-4 w-4" />
+          Refresh
+        </button>
+      }
+    />
+
+    <section className="mb-5 flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4">
+      <label className="grid gap-1 text-xs font-medium text-slate-600">
+        From
+        <input
+          type="date"
+          value={from}
+          onChange={(event) => setFrom(event.target.value)}
+          className="h-9 rounded-md border border-slate-200 px-3 text-sm"
+        />
+      </label>
+
+      <label className="grid gap-1 text-xs font-medium text-slate-600">
+        To
+        <input
+          type="date"
+          value={to}
+          onChange={(event) => setTo(event.target.value)}
+          className="h-9 rounded-md border border-slate-200 px-3 text-sm"
+        />
+      </label>
+
+      <button
+        onClick={() => {
+          setFrom("");
+          setTo("");
+        }}
+        className="h-9 rounded-md px-3 text-sm text-slate-600 hover:bg-slate-50"
+      >
+        Clear dates
+      </button>
+
+      <button
+        onClick={exportPayments}
+        className="ml-auto inline-flex h-9 items-center gap-2 rounded-md bg-indigo-600 px-3 text-sm font-semibold text-white"
+      >
+        <Download className="h-4 w-4" />
+        Export payments CSV
+      </button>
+    </section>
+
+    {error && (
+      <ErrorState
+        message={error}
+        onRetry={() => setReload((key) => key + 1)}
+      />
+    )}
+
+    <div className="grid gap-4 lg:grid-cols-2">
+      {reports.map((report) => (
+        <article
+          key={report.title}
+          className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900">
+                {report.title}
+              </h2>
+
+              <p className="mt-1 text-xs text-slate-500">
+                {report.description}
+              </p>
+            </div>
+
+            <b className="text-lg tabular-nums text-slate-900">
+              {loading ? "—" : report.value}
+            </b>
+          </div>
+
+          <div className="mt-4 border-t border-slate-100 pt-3 text-xs text-slate-500">
+            {loading
+              ? "Loading report…"
+              : `${report.rows.length} records · dates ${from || "any"} to ${to || "today"}`}
+          </div>
+        </article>
+      ))}
+    </div>
+
+    <section className="mt-5 overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <header className="border-b border-slate-100 px-5 py-4">
+        <h2 className="text-sm font-semibold">
+          Payment activity
+        </h2>
+
+        <p className="mt-1 text-xs text-slate-500">
+          Filtered payment records
+        </p>
+      </header>
+
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[620px] text-left text-sm">
+          <thead className="bg-slate-50 text-[11px] uppercase text-slate-500">
+            <tr>
+              {["Payment", "Customer", "Date", "Method", "Amount"].map(
+                (name) => (
+                  <th key={name} className="px-5 py-3">
+                    {name}
+                  </th>
+                )
+              )}
+            </tr>
+          </thead>
+
+          <tbody className="divide-y divide-slate-100">
+            {payments.slice(0, 8).map((row) => (
+              <tr key={row.id}>
+                <td className="px-5 py-3">
+                  {String(row.payment_number ?? row.id)}
+                </td>
+
+                <td className="px-5 py-3">
+                  {String(row.customer_name ?? "—")}
+                </td>
+
+                <td className="px-5 py-3">
+                  {formatDate(row.payment_date)}
+                </td>
+
+                <td className="px-5 py-3">
+                  {String(row.payment_method ?? "—")}
+                </td>
+
+                <td className="px-5 py-3 font-medium">
+                  {formatCurrency(row.amount)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {!loading && !payments.length && (
+          <p className="p-8 text-center text-sm text-slate-500">
+            No payment activity in this date range.
+          </p>
+        )}
+      </div>
+    </section>
+  </>
 }
 

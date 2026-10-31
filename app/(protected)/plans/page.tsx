@@ -18,11 +18,104 @@ export default function PlansPage() {
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load, reload]);
   async function submit(values: Record<string, string>) { setSaving(true); try { const editing = dialog !== "new" && dialog !== null; const response = await fetch(editing ? `/api/plans/${encodeURIComponent(dialog.id)}` : "/api/plans", { method: editing ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...values, minimum_quantity: Number(values.minimum_quantity), products: values.products.split(",").map((item) => item.trim()).filter(Boolean) }) }); if (!response.ok) throw new Error(`Save failed (${response.status}).`); setDialog(null); setNotice(editing ? "Plan updated." : "Plan created."); setReload((key) => key + 1); } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to save plan."); } finally { setSaving(false); } }
   async function remove(row: BillingRecord) { if (!window.confirm(`Delete ${String(row.name ?? "this plan")}?`)) return; try { const response = await fetch(`/api/plans/${encodeURIComponent(row.id)}`, { method: "DELETE" }); if (!response.ok) throw new Error(`Delete failed (${response.status}).`); setNotice("Plan deleted."); setReload((key) => key + 1); } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to delete plan."); } }
-  return <><PageHeader eyebrow="BILLING CONFIGURATION" title="Plans" description="Define billing intervals, availability rules, and renewal behavior." action={<div className="flex gap-2"><button onClick={() => setReload((key) => key + 1)} className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm"><RefreshCw className="h-4 w-4"/>Refresh</button><button onClick={() => setDialog("new")} className="inline-flex h-9 items-center gap-2 rounded-md bg-indigo-600 px-3 text-sm font-semibold text-white"><Plus className="h-4 w-4"/>Create plan</button></div>}/>
-    {notice && <button onClick={() => setNotice("")} className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">{notice} · dismiss</button>}{error && <ErrorState message={error} onRetry={() => setReload((key) => key + 1)}/>}
-    <EntityTable rows={rows} columns={columns} loading={loading} emptyLabel="No plans found. Create a plan to configure subscription billing." onEdit={setDialog} onDelete={remove}/>
-    <section className="mt-4 grid gap-3 md:grid-cols-3">{[{ title: "Flexible intervals", text: "Set daily, weekly, monthly, or annual billing." }, { title: "Availability", text: "Schedule when a plan can be purchased." }, { title: "Lifecycle rules", text: "Choose pause, renewal, and automatic closure behavior." }].map((item) => <article key={item.title} className="rounded-xl border border-slate-200 bg-white p-4"><h2 className="text-sm font-semibold">{item.title}</h2><p className="mt-1 text-xs leading-5 text-slate-500">{item.text}</p></article>)}</section>
-    {dialog && <RecordDialog title={dialog === "new" ? "Create plan" : "Edit plan"} fields={fields} initialValues={dialog === "new" ? {} : dialog} onClose={() => setDialog(null)} onSubmit={submit} saving={saving}/>}
-  </>;
+  return (
+    <>
+      <PageHeader
+        eyebrow="BILLING CONFIGURATION"
+        title="Plans"
+        description="Define billing intervals, availability rules, and renewal behavior."
+        action={
+          <div className="flex gap-2">
+            <button
+              onClick={() => setReload((key) => key + 1)}
+              className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Refresh
+            </button>
+
+            <button
+              onClick={() => setDialog("new")}
+              className="inline-flex h-9 items-center gap-2 rounded-md bg-indigo-600 px-3 text-sm font-semibold text-white"
+            >
+              <Plus className="h-4 w-4" />
+              Create plan
+            </button>
+          </div>
+        }
+      />
+
+      {/* Notice */}
+      {notice && (
+        <button
+          onClick={() => setNotice("")}
+          className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800"
+        >
+          {notice} · dismiss
+        </button>
+      )}
+
+      {/* Error */}
+      {error && (
+        <ErrorState
+          message={error}
+          onRetry={() => setReload((key) => key + 1)}
+        />
+      )}
+
+      {/* Plans Table */}
+      <EntityTable
+        rows={rows}
+        columns={columns}
+        loading={loading}
+        emptyLabel="No plans found. Create a plan to configure subscription billing."
+        onEdit={setDialog}
+        onDelete={remove}
+      />
+
+      {/* Plan Features */}
+      <section className="mt-4 grid gap-3 md:grid-cols-3">
+        {[
+          {
+            title: "Flexible intervals",
+            text: "Set daily, weekly, monthly, or annual billing.",
+          },
+          {
+            title: "Availability",
+            text: "Schedule when a plan can be purchased.",
+          },
+          {
+            title: "Lifecycle rules",
+            text: "Choose pause, renewal, and automatic closure behavior.",
+          },
+        ].map((item) => (
+          <article
+            key={item.title}
+            className="rounded-xl border border-slate-200 bg-white p-4"
+          >
+            <h2 className="text-sm font-semibold">
+              {item.title}
+            </h2>
+
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              {item.text}
+            </p>
+          </article>
+        ))}
+      </section>
+
+      {/* Create / Edit Plan Dialog */}
+      {dialog && (
+        <RecordDialog
+          title={dialog === "new" ? "Create plan" : "Edit plan"}
+          fields={fields}
+          initialValues={dialog === "new" ? {} : dialog}
+          onClose={() => setDialog(null)}
+          onSubmit={submit}
+          saving={saving}
+        />
+      )}
+    </>
+  );
 }
 

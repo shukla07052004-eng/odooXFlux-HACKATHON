@@ -15,6 +15,9 @@ async function createAdmin() {
     if (!email || !password) {
       throw new Error("Admin credentials are missing.");
     }
+    if (password.length < 9 || password.length > 72 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+      throw new Error("Admin password must be 9-72 characters and include uppercase, lowercase, number, and special characters.");
+    }
 
     // Check whether admin already exists
     const existing = await pool.query(

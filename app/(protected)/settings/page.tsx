@@ -6,13 +6,241 @@ import { ErrorState } from "@/components/ui/error-state";
 import { PageHeader } from "@/components/ui/page-header";
 
 export default function SettingsPage() {
-  const [saving, setSaving] = useState(false); const [error, setError] = useState(""); const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false); const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
   async function save(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setSaving(true); setError(""); setSaved(false); const values = Object.fromEntries(new FormData(event.currentTarget).entries()); try { const response = await fetch("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) }); if (!response.ok) throw new Error(`Settings API returned ${response.status}.`); setSaved(true); } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to save workspace settings."); } finally { setSaving(false); } }
-  return <><PageHeader eyebrow="WORKSPACE" title="Settings" description="Configure business identity, billing defaults, and account preferences."/>{error && <ErrorState message={error}/>}{saved && <div role="status" className="mb-4 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"><Check className="h-4 w-4"/>Workspace settings saved.</div>}
-    <form onSubmit={save} className="grid gap-5 xl:grid-cols-[1.4fr_1fr]"><div className="space-y-5"><section className="rounded-xl border border-slate-200 bg-white p-5"><h2 className="text-sm font-semibold">Business profile</h2><p className="mt-1 text-xs text-slate-500">Information displayed on customer-facing billing documents.</p><div className="mt-5 grid gap-4 sm:grid-cols-2">{[{ key: "business_name", label: "Business name", value: "Brightloop Software", required: true }, { key: "support_email", label: "Support email", value: "billing@brightloop.example", type: "email" }, { key: "phone", label: "Support phone", value: "+91 80 4567 8900", type: "tel" }, { key: "website", label: "Website", value: "https://brightloop.example" }].map((field) => <label key={field.key} className="grid gap-1.5 text-xs font-medium text-slate-700">{field.label}<input name={field.key} type={field.type ?? "text"} defaultValue={field.value} required={field.required} className="h-10 rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-indigo-400"/></label>)}</div><label className="mt-4 grid gap-1.5 text-xs font-medium text-slate-700">Billing address<textarea name="billing_address" defaultValue="Bengaluru, Karnataka, India" rows={3} className="rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400"/></label></section>
-      <section className="rounded-xl border border-slate-200 bg-white p-5"><h2 className="text-sm font-semibold">Billing defaults</h2><p className="mt-1 text-xs text-slate-500">Set sensible defaults for new invoices and subscriptions.</p><div className="mt-5 grid gap-4 sm:grid-cols-2"><label className="grid gap-1.5 text-xs font-medium text-slate-700">Currency<select name="currency" defaultValue="INR" className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm"><option value="INR">INR · Indian Rupee</option><option value="USD">USD · US Dollar</option><option value="EUR">EUR · Euro</option></select></label><label className="grid gap-1.5 text-xs font-medium text-slate-700">Default payment terms<select name="payment_terms" defaultValue="Net 30" className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm"><option>Due on receipt</option><option>Net 15</option><option>Net 30</option><option>Net 45</option></select></label><label className="grid gap-1.5 text-xs font-medium text-slate-700">Default tax rate (%)<input name="tax_rate" type="number" min="0" max="100" step="0.01" defaultValue="18" className="h-10 rounded-md border border-slate-200 px-3 text-sm"/></label><label className="grid gap-1.5 text-xs font-medium text-slate-700">Invoice number prefix<input name="invoice_prefix" defaultValue="BL-INV" className="h-10 rounded-md border border-slate-200 px-3 text-sm"/></label></div></section></div>
-      <aside className="space-y-5"><section className="rounded-xl border border-slate-200 bg-white p-5"><h2 className="text-sm font-semibold">Renewal reminders</h2><p className="mt-1 text-xs text-slate-500">Remind the team ahead of upcoming renewals.</p><div className="mt-5 space-y-4">{[{ key: "reminder_30_days", title: "30 days before", text: "Early renewal planning" }, { key: "reminder_7_days", title: "7 days before", text: "Customer follow-up" }, { key: "reminder_1_day", title: "1 day before", text: "Final renewal reminder" }].map((item, index) => <label key={item.key} className="flex items-start gap-3"><input name={item.key} type="checkbox" defaultChecked={index < 2} className="mt-0.5 h-4 w-4 accent-indigo-600"/><span><b className="block text-sm font-medium text-slate-800">{item.title}</b><small className="mt-0.5 block text-xs text-slate-500">{item.text}</small></span></label>)}</div></section><section className="rounded-xl border border-indigo-100 bg-indigo-50 p-5"><h2 className="text-sm font-semibold text-indigo-950">API integration</h2><p className="mt-2 text-xs leading-5 text-indigo-900/70">Workspace preferences are submitted to <code className="rounded bg-white/70 px-1">PATCH /api/settings</code>. Implement this route in your backend to persist changes.</p></section></aside>
-      <div className="flex justify-end xl:col-span-2"><button disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-md bg-indigo-600 px-4 text-sm font-semibold text-white disabled:opacity-60"><Save className="h-4 w-4"/>{saving ? "Saving…" : "Save settings"}</button></div></form>
-  </>;
+  return <>
+    <PageHeader
+      eyebrow="WORKSPACE"
+      title="Settings"
+      description="Configure business identity, billing defaults, and account preferences."
+    />
+
+    {error && <ErrorState message={error} />}
+
+    {saved && (
+      <div
+        role="status"
+        className="mb-4 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"
+      >
+        <Check className="h-4 w-4" />
+        Workspace settings saved.
+      </div>
+    )}
+
+    <form
+      onSubmit={save}
+      className="grid gap-5 xl:grid-cols-[1.4fr_1fr]"
+    >
+      <div className="space-y-5">
+        <section className="rounded-xl border border-slate-200 bg-white p-5">
+          <h2 className="text-sm font-semibold">
+            Business profile
+          </h2>
+
+          <p className="mt-1 text-xs text-slate-500">
+            Information displayed on customer-facing billing documents.
+          </p>
+
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            {[
+              {
+                key: "business_name",
+                label: "Business name",
+                value: "Brightloop Software",
+                required: true,
+              },
+              {
+                key: "support_email",
+                label: "Support email",
+                value: "billing@brightloop.example",
+                type: "email",
+              },
+              {
+                key: "phone",
+                label: "Support phone",
+                value: "+91 80 4567 8900",
+                type: "tel",
+              },
+              {
+                key: "website",
+                label: "Website",
+                value: "https://brightloop.example",
+              },
+            ].map((field) => (
+              <label
+                key={field.key}
+                className="grid gap-1.5 text-xs font-medium text-slate-700"
+              >
+                {field.label}
+
+                <input
+                  name={field.key}
+                  type={field.type ?? "text"}
+                  defaultValue={field.value}
+                  required={field.required}
+                  className="h-10 rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-indigo-400"
+                />
+              </label>
+            ))}
+          </div>
+
+          <label className="mt-4 grid gap-1.5 text-xs font-medium text-slate-700">
+            Billing address
+
+            <textarea
+              name="billing_address"
+              defaultValue="Bengaluru, Karnataka, India"
+              rows={3}
+              className="rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400"
+            />
+          </label>
+        </section>
+
+        <section className="rounded-xl border border-slate-200 bg-white p-5">
+          <h2 className="text-sm font-semibold">
+            Billing defaults
+          </h2>
+
+          <p className="mt-1 text-xs text-slate-500">
+            Set sensible defaults for new invoices and subscriptions.
+          </p>
+
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <label className="grid gap-1.5 text-xs font-medium text-slate-700">
+              Currency
+
+              <select
+                name="currency"
+                defaultValue="INR"
+                className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm"
+              >
+                <option value="INR">INR · Indian Rupee</option>
+                <option value="USD">USD · US Dollar</option>
+                <option value="EUR">EUR · Euro</option>
+              </select>
+            </label>
+
+            <label className="grid gap-1.5 text-xs font-medium text-slate-700">
+              Default payment terms
+
+              <select
+                name="payment_terms"
+                defaultValue="Net 30"
+                className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm"
+              >
+                <option>Due on receipt</option>
+                <option>Net 15</option>
+                <option>Net 30</option>
+                <option>Net 45</option>
+              </select>
+            </label>
+
+            <label className="grid gap-1.5 text-xs font-medium text-slate-700">
+              Default tax rate (%)
+
+              <input
+                name="tax_rate"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                defaultValue="18"
+                className="h-10 rounded-md border border-slate-200 px-3 text-sm"
+              />
+            </label>
+
+            <label className="grid gap-1.5 text-xs font-medium text-slate-700">
+              Invoice number prefix
+
+              <input
+                name="invoice_prefix"
+                defaultValue="BL-INV"
+                className="h-10 rounded-md border border-slate-200 px-3 text-sm"
+              />
+            </label>
+          </div>
+        </section>
+      </div>
+
+      <aside className="space-y-5">
+        <section className="rounded-xl border border-slate-200 bg-white p-5">
+          <h2 className="text-sm font-semibold">
+            Renewal reminders
+          </h2>
+
+          <p className="mt-1 text-xs text-slate-500">
+            Remind the team ahead of upcoming renewals.
+          </p>
+
+          <div className="mt-5 space-y-4">
+            {[
+              {
+                key: "reminder_30_days",
+                title: "30 days before",
+                text: "Early renewal planning",
+              },
+              {
+                key: "reminder_7_days",
+                title: "7 days before",
+                text: "Customer follow-up",
+              },
+              {
+                key: "reminder_1_day",
+                title: "1 day before",
+                text: "Final renewal reminder",
+              },
+            ].map((item, index) => (
+              <label
+                key={item.key}
+                className="flex items-start gap-3"
+              >
+                <input
+                  name={item.key}
+                  type="checkbox"
+                  defaultChecked={index < 2}
+                  className="mt-0.5 h-4 w-4 accent-indigo-600"
+                />
+
+                <span>
+                  <b className="block text-sm font-medium text-slate-800">
+                    {item.title}
+                  </b>
+
+                  <small className="mt-0.5 block text-xs text-slate-500">
+                    {item.text}
+                  </small>
+                </span>
+              </label>
+            ))}
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-indigo-100 bg-indigo-50 p-5">
+          <h2 className="text-sm font-semibold text-indigo-950">
+            API integration
+          </h2>
+
+          <p className="mt-2 text-xs leading-5 text-indigo-900/70">
+            Workspace preferences are submitted to{" "}
+            <code className="rounded bg-white/70 px-1">
+              PATCH /api/settings
+            </code>
+            . Implement this route in your backend to persist changes.
+          </p>
+        </section>
+      </aside>
+
+      <div className="flex justify-end xl:col-span-2">
+        <button
+          disabled={saving}
+          className="inline-flex h-10 items-center gap-2 rounded-md bg-indigo-600 px-4 text-sm font-semibold text-white disabled:opacity-60"
+        >
+          <Save className="h-4 w-4" />
+          {saving ? "Saving…" : "Save settings"}
+        </button>
+      </div>
+    </form>
+  </>
 }
 

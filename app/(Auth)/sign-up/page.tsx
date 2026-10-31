@@ -104,6 +104,7 @@ export default function SignupForm() {
                                     autoComplete="new-password"
                                     required
                                 />
+                                <span className="text-xs text-slate-500">Use more than 8 characters with uppercase, lowercase, number, and special character.</span>
                                 <button
                                     className="group/btn relative cursor-pointer block h-10 w-full ounded-md bg-gradient-to-br from-black to-neutral-600 font-medium text-white shadow-[0px_1px_0px_0px_#ffffff40_inset,0px_-1px_0px_0px_#ffffff40_inset] dark:bg-zinc-800 dark:from-zinc-900 dark:to-zinc-900 dark:shadow-[0px_1px_0px_0px_#27272a_inset,0px_-1px_0px_0px_#27272a_inset]"
                                     type="submit"
