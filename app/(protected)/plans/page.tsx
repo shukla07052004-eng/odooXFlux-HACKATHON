@@ -1,0 +1,28 @@
+'use client';
+
+import { useCallback, useEffect, useState } from "react";
+import { Plus, RefreshCw } from "lucide-react";
+import { EntityTable } from "@/components/ui/entity-table";
+import { ErrorState } from "@/components/ui/error-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { RecordDialog } from "@/components/ui/record-dialog";
+import type { BillingRecord, FormFieldDefinition } from "@/types/billing";
+import { parseApiList } from "@/lib/format";
+
+const fields: FormFieldDefinition[] = [{ key: "name", label: "Plan name", required: true }, { key: "billing_interval", label: "Billing interval", options: ["Daily", "Weekly", "Monthly", "Yearly"] }, { key: "minimum_quantity", label: "Minimum quantity", type: "number", required: true }, { key: "availability_start", label: "Available from", type: "date" }, { key: "availability_end", label: "Available until", type: "date" }, { key: "auto_close", label: "Auto close", options: ["Disabled", "Enabled"] }, { key: "allow_pause", label: "Allow pause", options: ["Yes", "No"] }, { key: "allow_renewal", label: "Allow renewal", options: ["Yes", "No"] }, { key: "products", label: "Associated products (IDs or names)", type: "textarea" }];
+const columns = [{ key: "name", label: "Plan" }, { key: "billing_interval", label: "Interval" }, { key: "minimum_quantity", label: "Min qty" }, { key: "availability_start", label: "Available from", format: "date" as const }, { key: "availability_end", label: "Available until", format: "date" as const }, { key: "status", label: "Status", format: "status" as const }];
+
+export default function PlansPage() {
+  const [rows, setRows] = useState<BillingRecord[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState(""); const [notice, setNotice] = useState(""); const [reload, setReload] = useState(0); const [dialog, setDialog] = useState<null | BillingRecord | "new">(null); const [saving, setSaving] = useState(false);
+  const load = useCallback(async () => { setLoading(true); setError(""); try { const response = await fetch("/api/plans", { cache: "no-store" }); if (!response.ok) throw new Error(`Plans API returned ${response.status}.`); setRows(await parseApiList<BillingRecord>(response)); } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to load plans."); } finally { setLoading(false); } }, []);
+  useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load, reload]);
+  async function submit(values: Record<string, string>) { setSaving(true); try { const editing = dialog !== "new" && dialog !== null; const response = await fetch(editing ? `/api/plans/${encodeURIComponent(dialog.id)}` : "/api/plans", { method: editing ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...values, minimum_quantity: Number(values.minimum_quantity), products: values.products.split(",").map((item) => item.trim()).filter(Boolean) }) }); if (!response.ok) throw new Error(`Save failed (${response.status}).`); setDialog(null); setNotice(editing ? "Plan updated." : "Plan created."); setReload((key) => key + 1); } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to save plan."); } finally { setSaving(false); } }
+  async function remove(row: BillingRecord) { if (!window.confirm(`Delete ${String(row.name ?? "this plan")}?`)) return; try { const response = await fetch(`/api/plans/${encodeURIComponent(row.id)}`, { method: "DELETE" }); if (!response.ok) throw new Error(`Delete failed (${response.status}).`); setNotice("Plan deleted."); setReload((key) => key + 1); } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to delete plan."); } }
+  return <><PageHeader eyebrow="BILLING CONFIGURATION" title="Plans" description="Define billing intervals, availability rules, and renewal behavior." action={<div className="flex gap-2"><button onClick={() => setReload((key) => key + 1)} className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm"><RefreshCw className="h-4 w-4"/>Refresh</button><button onClick={() => setDialog("new")} className="inline-flex h-9 items-center gap-2 rounded-md bg-indigo-600 px-3 text-sm font-semibold text-white"><Plus className="h-4 w-4"/>Create plan</button></div>}/>
+    {notice && <button onClick={() => setNotice("")} className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">{notice} · dismiss</button>}{error && <ErrorState message={error} onRetry={() => setReload((key) => key + 1)}/>}
+    <EntityTable rows={rows} columns={columns} loading={loading} emptyLabel="No plans found. Create a plan to configure subscription billing." onEdit={setDialog} onDelete={remove}/>
+    <section className="mt-4 grid gap-3 md:grid-cols-3">{[{ title: "Flexible intervals", text: "Set daily, weekly, monthly, or annual billing." }, { title: "Availability", text: "Schedule when a plan can be purchased." }, { title: "Lifecycle rules", text: "Choose pause, renewal, and automatic closure behavior." }].map((item) => <article key={item.title} className="rounded-xl border border-slate-200 bg-white p-4"><h2 className="text-sm font-semibold">{item.title}</h2><p className="mt-1 text-xs leading-5 text-slate-500">{item.text}</p></article>)}</section>
+    {dialog && <RecordDialog title={dialog === "new" ? "Create plan" : "Edit plan"} fields={fields} initialValues={dialog === "new" ? {} : dialog} onClose={() => setDialog(null)} onSubmit={submit} saving={saving}/>}
+  </>;
+}
+
