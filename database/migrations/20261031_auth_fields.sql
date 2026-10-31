@@ -13,7 +13,8 @@ ALTER TABLE users
   ADD COLUMN IF NOT EXISTS verification_attempts INTEGER NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS verification_sent_at TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS password_reset_token_hash TEXT,
-  ADD COLUMN IF NOT EXISTS password_reset_token_expiry TIMESTAMPTZ;
+  ADD COLUMN IF NOT EXISTS password_reset_token_expiry TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS password_reset_requested_at TIMESTAMPTZ;
 
 ALTER TABLE users ALTER COLUMN is_verified SET DEFAULT FALSE;
 ALTER TABLE users ALTER COLUMN is_active SET DEFAULT TRUE;

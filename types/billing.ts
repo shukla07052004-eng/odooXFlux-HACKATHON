@@ -11,6 +11,7 @@ export type FormFieldDefinition = {
   label: string;
   type?: "text" | "email" | "tel" | "number" | "date" | "textarea";
   required?: boolean;
-  options?: string[];
+  options?: Array<string | { label: string; value: string }>;
+  multiple?: boolean;
   placeholder?: string;
 };

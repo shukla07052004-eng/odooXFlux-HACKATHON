@@ -1,15 +1,58 @@
 'use client';
 
-import { useState, type FormEvent } from "react";
+import { Suspense, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import AuthCard from "@/styles/AuthCard";
 import { errorBoxClass } from "@/styles/formStyles";
 import { Input } from "@/components/ui/input";
 
 type ApiResponse = { success: boolean; message: string };
+
 export default function ResetPasswordPage() {
-  const router = useRouter(); const [password, setPassword] = useState(""); const [confirm, setConfirm] = useState(""); const [loading, setLoading] = useState(false); const [error, setError] = useState("");
-  async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setError(""); if (password !== confirm) { setError("Passwords do not match."); return; } if (password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) { setError("Use at least 8 characters with upper and lowercase letters, a number, and a special character."); return; } const resetToken = sessionStorage.getItem("brightloopResetToken"); if (!resetToken) { setError("Your reset session is missing or expired. Request a new password reset code."); return; } setLoading(true); try { const response = await fetch("/api/reset-password", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ resetToken, password }) }); const result = await response.json() as ApiResponse; if (!response.ok || !result.success) { setError(result.message || "Could not reset your password."); return; } sessionStorage.removeItem("brightloopResetToken"); router.replace("/sign-in?passwordReset=1"); } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to reach the password reset service."); } finally { setLoading(false); } }
-  return <AuthCard title="Choose a new password" subtitle="Use a strong password you have not used before."><div className="mx-auto mt-7 w-full max-w-md rounded-2xl bg-white p-6 shadow-xl md:p-8">{error && <div role="alert" className={`${errorBoxClass} mb-4`}>{error}</div>}<form onSubmit={submit} className="space-y-4"><label className="grid gap-1.5 text-sm font-medium text-slate-700">New password<Input type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} required disabled={loading}/></label><label className="grid gap-1.5 text-sm font-medium text-slate-700">Confirm password<Input type="password" autoComplete="new-password" value={confirm} onChange={(event) => setConfirm(event.target.value)} required disabled={loading}/></label><button disabled={loading} className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{loading ? "Saving password…" : "Update password"}</button></form><p className="mt-5 text-center text-sm text-slate-500"><Link href="/forgot-password" className="font-medium text-indigo-600">Request another reset code</Link></p></div></AuthCard>;
+  return <Suspense fallback={<AuthCard title="Choose a new password" subtitle="Loading your secure reset link…"><div className="h-24" /></AuthCard>}><ResetPasswordForm /></Suspense>;
+}
+
+function ResetPasswordForm() {
+  const router = useRouter();
+  const token = useSearchParams().get("token") ?? "";
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    if (!token) { setError("The reset link is missing or expired. Request another reset link."); return; }
+    if (password !== confirm) { setError("Passwords do not match."); return; }
+    if (password.length < 9 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+      setError("Use more than 8 characters with uppercase, lowercase, a number, and a special character.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const response = await fetch("/api/reset-password", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ resetToken: token, password }) });
+      const result = await response.json() as ApiResponse;
+      if (!response.ok || !result.success) { setError(result.message || "Could not reset your password."); return; }
+      router.replace("/sign-in?passwordReset=1");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to reach the password reset service.");
+    } finally { setLoading(false); }
+  }
+
+  return (
+    <AuthCard title="Choose a new password" subtitle="Use a strong password you have not used before.">
+      <div className="mx-auto mt-7 w-full max-w-md rounded-2xl bg-white p-6 shadow-xl md:p-8">
+        {error && <div role="alert" className={`${errorBoxClass} mb-4`}>{error}</div>}
+        <form onSubmit={submit} className="space-y-4">
+          <label className="grid gap-1.5 text-sm font-medium text-slate-700">New password<Input type="password" autoComplete="new-password" minLength={9} maxLength={72} value={password} onChange={(event) => setPassword(event.target.value)} required disabled={loading} /></label>
+          <p className="text-xs text-slate-500">More than 8 characters with uppercase, lowercase, number, and special character.</p>
+          <label className="grid gap-1.5 text-sm font-medium text-slate-700">Confirm password<Input type="password" autoComplete="new-password" minLength={9} maxLength={72} value={confirm} onChange={(event) => setConfirm(event.target.value)} required disabled={loading} /></label>
+          <button disabled={loading || !token} className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{loading ? "Saving password…" : "Update password"}</button>
+        </form>
+        <p className="mt-5 text-center text-sm text-slate-500"><Link href="/forgot-password" className="font-medium text-indigo-600">Request another reset link</Link></p>
+      </div>
+    </AuthCard>
+  );
 }

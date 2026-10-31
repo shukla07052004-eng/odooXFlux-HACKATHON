@@ -13,13 +13,19 @@ export async function GET(request: Request) {
   const auth = await requireApiUser(request, ["admin", "staff"]);
   if (!auth.user) return auth.response;
   try {
+    const search = new URL(request.url).searchParams;
+    const page = Math.max(1, Number(search.get("page") || 1));
+    const pageSize = Math.min(100, Math.max(1, Number(search.get("pageSize") || 50)));
+    const paginate = search.has("page") || search.has("pageSize");
+    const where = "role='customer' AND ($1::text='admin' OR assigned_staff_id=$2)";
+    const count = paginate ? await pool.query(`SELECT COUNT(*)::int AS total FROM users WHERE ${where}`, [auth.user.role,auth.user.id]) : null;
     const result = await pool.query(
       `SELECT id, name, email, phone, company, address, is_active, is_verified, created_at,
               CASE WHEN is_active THEN 'Active' ELSE 'Inactive' END AS status
-         FROM users WHERE role = 'customer' AND ($1::text = 'admin' OR assigned_staff_id = $2) ORDER BY created_at DESC`,
-      [auth.user.role, auth.user.id],
+         FROM users WHERE ${where} ORDER BY created_at DESC${paginate ? " LIMIT $3 OFFSET $4" : ""}`,
+      paginate ? [auth.user.role,auth.user.id,pageSize,(page-1)*pageSize] : [auth.user.role, auth.user.id],
     );
-    return Response.json({ data: result.rows });
+    return Response.json({ data: result.rows, ...(count ? { pagination: { page, pageSize, total: count.rows[0].total, totalPages: Math.max(1,Math.ceil(count.rows[0].total/pageSize)) } } : {}) });
   } catch (error) { return authErrorResponse(error, "customers:list"); }
 }
 

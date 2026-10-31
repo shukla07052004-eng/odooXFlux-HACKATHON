@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     const [profile, subscriptions, quotations, invoices, payments] = await Promise.all([
       pool.query("SELECT id,name,email,phone,company,address FROM users WHERE id=$1 AND role='customer'", [auth.user.id]),
       pool.query(
-        `SELECT s.id, s.subscription_number, s.status, s.start_date, s.expiry_date, p.name AS plan_name
+        `SELECT s.id, s.subscription_number, s.status, s.start_date, s.expiry_date, s.next_billing_date, p.name AS plan_name, p.allow_pause
            FROM subscriptions s LEFT JOIN plans p ON p.id = s.plan_id
           WHERE s.customer_id = $1 ORDER BY s.created_at DESC`,
         [auth.user.id],

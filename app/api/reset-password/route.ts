@@ -4,7 +4,7 @@ import pool from "@/lib/db";
 import { hashAuthSecret } from "@/lib/auth/codes";
 import { authErrorResponse, validationError } from "@/lib/auth/http";
 
-const passwordSchema = z.string().min(8, "Password must be at least 8 characters").max(72, "Password is too long")
+const passwordSchema = z.string().min(9, "Password must be more than 8 characters").max(72, "Password is too long")
   .regex(/[A-Z]/, "Password must contain an uppercase letter")
   .regex(/[a-z]/, "Password must contain a lowercase letter")
   .regex(/[0-9]/, "Password must contain a number")

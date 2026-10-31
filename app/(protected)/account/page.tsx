@@ -9,10 +9,11 @@ import { PageHeader } from "@/components/ui/page-header";
 type Row = { id: string;[key: string]: unknown };
 type AccountData = { user: { name: string; email: string; phone?: string | null; company?: string | null; address?: string | null }; subscriptions: Row[]; quotations: Row[]; invoices: Row[]; payments: Row[] };
 export default function AccountPage() {
-  const [data, setData] = useState<AccountData | null>(null); const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [error, setError] = useState(""); const [notice, setNotice] = useState(""); const [reload, setReload] = useState(0);
+  const [data, setData] = useState<AccountData | null>(null); const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [subscriptionSaving, setSubscriptionSaving] = useState(""); const [error, setError] = useState(""); const [notice, setNotice] = useState(""); const [reload, setReload] = useState(0);
   const [profile, setProfile] = useState({ name: "", phone: "", company: "", address: "" });
   useEffect(() => { const controller = new AbortController(); const timer = window.setTimeout(() => { void (async () => { setLoading(true); setError(""); try { const response = await fetch("/api/account", { cache: "no-store", signal: controller.signal }); const result = await response.json() as AccountData & { message?: string }; if (!response.ok) throw new Error(result.message ?? `Account endpoint returned ${response.status}.`); setData(result); setProfile({ name: result.user.name, phone: result.user.phone ?? "", company: result.user.company ?? "", address: result.user.address ?? "" }); } catch (reason) { if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : "Unable to load your account."); } finally { if (!controller.signal.aborted) setLoading(false); } })(); }, 0); return () => { window.clearTimeout(timer); controller.abort(); }; }, [reload]);
   async function saveProfile(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setSaving(true); setError(""); setNotice(""); try { const response = await fetch("/api/account", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(profile) }); const result = await response.json() as { success?: boolean; user?: AccountData["user"]; message?: string }; if (!response.ok || !result.success || !result.user) throw new Error(result.message ?? `Profile update failed (${response.status}).`); setData((current) => current ? { ...current, user: result.user! } : current); setProfile({ name: result.user.name, phone: result.user.phone ?? "", company: result.user.company ?? "", address: result.user.address ?? "" }); setNotice(result.message ?? "Profile updated."); } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to update your profile."); } finally { setSaving(false); } }
+  async function changeSubscriptionStatus(row: Row) { const current = String(row.status ?? "").toLowerCase(); const status = current === "active" ? "Paused" : "Active"; setSubscriptionSaving(row.id); setError(""); try { const response = await fetch(`/api/subscriptions/${encodeURIComponent(row.id)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }) }); const result = await response.json() as { message?: string }; if (!response.ok) throw new Error(result.message ?? `Subscription update failed (${response.status}).`); setNotice(`Subscription ${status.toLowerCase()}.`); setReload((value) => value + 1); } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to update subscription."); } finally { setSubscriptionSaving(""); } }
   return (
     <>
       <PageHeader
@@ -205,6 +206,11 @@ export default function AccountPage() {
                       <StatusBadge
                         status={String(row.status ?? "Recorded")}
                       />
+                      {section.title === "Subscriptions" && row.allow_pause === true && ["active", "paused"].includes(String(row.status).toLowerCase()) && (
+                        <button type="button" disabled={subscriptionSaving === row.id} onClick={() => void changeSubscriptionStatus(row)} className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 disabled:opacity-50">
+                          {subscriptionSaving === row.id ? "Saving…" : String(row.status).toLowerCase() === "active" ? "Pause" : "Resume"}
+                        </button>
+                      )}
                     </div>
                   </article>
                 ))}

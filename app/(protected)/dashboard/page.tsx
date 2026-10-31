@@ -1,42 +1,47 @@
 'use client';
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, CreditCard, FileWarning, RefreshCw, Wallet } from "lucide-react";
 import { ErrorState } from "@/components/ui/error-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { formatCurrency, formatDate, parseApiList } from "@/lib/format";
+import { formatCurrency, formatDate } from "@/lib/format";
 import type { BillingRecord } from "@/types/billing";
 
-type DashboardData = { subscriptions: BillingRecord[]; invoices: BillingRecord[]; payments: BillingRecord[] };
+type DashboardData = {
+  active_subscriptions: number;
+  collected_revenue: number;
+  outstanding_amount: number;
+  overdue_invoices: number;
+  status_distribution: Array<{ status: string; count: number }>;
+  revenue_by_month: Array<{ month: string; amount: number }>;
+  subscriptions_by_month: Array<{ month: string; count: number }>;
+  recent_invoices: BillingRecord[];
+  recent_payments: BillingRecord[];
+  upcoming_renewals: BillingRecord[];
+};
+const emptyDashboard: DashboardData = { active_subscriptions: 0, collected_revenue: 0, outstanding_amount: 0, overdue_invoices: 0, status_distribution: [], revenue_by_month: [], subscriptions_by_month: [], recent_invoices: [], recent_payments: [], upcoming_renewals: [] };
 
 export default function DashboardPage() {
-  const [data, setData] = useState<DashboardData>({ subscriptions: [], invoices: [], payments: [] });
+  const [data, setData] = useState<DashboardData>(emptyDashboard);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let active = true;
-    const resources = ["subscriptions", "invoices", "payments"] as const;
-    Promise.all(resources.map(async (resource) => {
-      const response = await fetch(`/api/${resource}`, { cache: "no-store" });
-      if (!response.ok) throw new Error(`${resource} endpoint returned ${response.status}.`);
-      return [resource, await parseApiList<BillingRecord>(response)] as const;
-    })).then((entries) => { if (active) setData(Object.fromEntries(entries) as DashboardData); })
+    fetch("/api/reports/summary", { cache: "no-store" })
+      .then(async (response) => { const result = await response.json() as { data?: DashboardData; message?: string }; if (!response.ok || !result.data) throw new Error(result.message ?? `Dashboard summary returned ${response.status}.`); return result.data; })
+      .then((summary) => { if (active) setData(summary); })
       .catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : "Dashboard data is unavailable."); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [reloadKey]);
 
-  const activeCount = data.subscriptions.filter((row) => String(row.status).toLowerCase() === "active").length;
-  const revenue = data.payments.reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
-  const outstanding = data.invoices.reduce((sum, row) => sum + Math.max(Number(row.total_amount ?? row.amount ?? 0) - Number(row.paid_amount ?? row.paid ?? 0), 0), 0);
-  const overdueCount = data.invoices.filter((row) => String(row.status).toLowerCase() === "overdue").length;
-  const recentInvoices = useMemo(() => [...data.invoices].slice(0, 4), [data.invoices]);
-  const bars = ["May", "Jun", "Jul", "Aug", "Sep", "Oct"].map((month, index) => ({ month, amount: Math.max(0, revenue * (0.48 + index * 0.09)) }));
-  const maxBar = Math.max(...bars.map((bar) => bar.amount), 1);
+  const revenue = Number(data.collected_revenue);
+  const maxBar = Math.max(...data.revenue_by_month.map((bar) => Number(bar.amount)), 1);
+  const subscriptionsTotal = data.status_distribution.reduce((sum, row) => sum + Number(row.count), 0);
 
   return (
     <>
@@ -83,21 +88,21 @@ export default function DashboardPage() {
           },
           {
             label: "Active subscriptions",
-            value: String(activeCount),
-            note: `${data.subscriptions.length} total records`,
+            value: String(data.active_subscriptions),
+            note: "Current active agreements",
             icon: RefreshCw,
             tint: "bg-emerald-50 text-emerald-700",
           },
           {
             label: "Outstanding amount",
-            value: formatCurrency(outstanding),
+            value: formatCurrency(data.outstanding_amount),
             note: "Across open invoices",
             icon: CreditCard,
             tint: "bg-amber-50 text-amber-700",
           },
           {
             label: "Overdue invoices",
-            value: String(overdueCount),
+            value: String(data.overdue_invoices),
             note: "Needs follow-up",
             icon: FileWarning,
             tint: "bg-rose-50 text-rose-600",
@@ -137,8 +142,8 @@ export default function DashboardPage() {
                 Payments collected
               </h2>
 
-              <p className="mt-1 text-xs text-slate-500">
-                Six-month activity · current API data
+            <p className="mt-1 text-xs text-slate-500">
+                Collected payments by month · last six months
               </p>
             </div>
 
@@ -148,7 +153,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="mt-7 grid h-52 grid-cols-6 items-end gap-3">
-            {bars.map((bar) => (
+            {data.revenue_by_month.map((bar) => (
               <div
                 key={bar.month}
                 className="flex h-full flex-col items-center justify-end gap-2"
@@ -157,7 +162,7 @@ export default function DashboardPage() {
                   title={formatCurrency(bar.amount)}
                   className="w-full max-w-12 rounded-t-md bg-indigo-500/85 transition-all"
                   style={{
-                    height: `${Math.max(5, (bar.amount / maxBar) * 100)}%`,
+                    height: `${Math.max(5, (Number(bar.amount) / maxBar) * 100)}%`,
                   }}
                 />
 
@@ -170,7 +175,7 @@ export default function DashboardPage() {
 
           <div className="mt-3 flex items-center gap-2 text-[11px] text-slate-500">
             <span className="h-2 w-2 rounded-full bg-indigo-500" />
-            Derived from the payments endpoint
+            Revenue totals are aggregated in PostgreSQL
           </div>
         </section>
 
@@ -194,13 +199,10 @@ export default function DashboardPage() {
 
           <div className="mt-5 space-y-4">
             {["Active", "Paused", "Closed", "Draft"].map((status) => {
-              const count = data.subscriptions.filter(
-                (row) =>
-                  String(row.status).toLowerCase() === status.toLowerCase()
-              ).length;
+              const count = Number(data.status_distribution.find((row) => row.status.toLowerCase() === status.toLowerCase())?.count ?? 0);
 
-              const ratio = data.subscriptions.length
-                ? (count / data.subscriptions.length) * 100
+              const ratio = subscriptionsTotal
+                ? (count / subscriptionsTotal) * 100
                 : 0;
 
               return (
@@ -213,7 +215,7 @@ export default function DashboardPage() {
                   <div className="h-1.5 rounded-full bg-slate-100">
                     <div
                       className="h-1.5 rounded-full bg-indigo-500"
-                      style={{ width: `${ratio}%` }}
+                  style={{ width: `${ratio}%` }}
                     />
                   </div>
                 </div>
@@ -222,7 +224,7 @@ export default function DashboardPage() {
           </div>
 
           <p className="mt-5 text-xs text-slate-400">
-            {data.subscriptions.length} subscriptions loaded
+            {subscriptionsTotal} subscriptions
           </p>
         </section>
 
@@ -252,9 +254,9 @@ export default function DashboardPage() {
             <p className="p-5 text-sm text-slate-500">
               Loading invoice activity…
             </p>
-          ) : recentInvoices.length ? (
+          ) : data.recent_invoices.length ? (
             <div className="divide-y divide-slate-100">
-              {recentInvoices.map((invoice) => (
+              {data.recent_invoices.map((invoice) => (
                 <div
                   key={invoice.id}
                   className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"
@@ -294,6 +296,20 @@ export default function DashboardPage() {
               No invoices returned by the API yet.
             </p>
           )}
+        </section>
+        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-slate-900">Recent payments</h2>
+          {data.recent_payments.length ? <div className="mt-3 divide-y divide-slate-100">{data.recent_payments.map((payment) => <div key={payment.id} className="flex justify-between gap-3 py-2 text-sm"><span className="truncate text-slate-600">{String(payment.customer_name ?? payment.invoice_number ?? "Payment")} · {formatDate(payment.payment_date)}</span><b>{formatCurrency(payment.amount)}</b></div>)}</div> : <p className="mt-3 text-sm text-slate-500">No payments recorded yet.</p>}
+        </section>
+
+        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-slate-900">Upcoming renewals</h2>
+          {data.upcoming_renewals.length ? <div className="mt-3 divide-y divide-slate-100">{data.upcoming_renewals.map((renewal) => <div key={renewal.id} className="flex justify-between gap-3 py-2 text-sm"><span className="truncate text-slate-600">{String(renewal.customer_name ?? renewal.subscription_number)}</span><span className="shrink-0 text-slate-500">{formatDate(renewal.expiry_date)}</span></div>)}</div> : <p className="mt-3 text-sm text-slate-500">No renewals due in the next 30 days.</p>}
+        </section>
+
+        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm xl:col-span-2">
+          <h2 className="text-sm font-semibold text-slate-900">Subscription growth</h2>
+          <div className="mt-4 grid h-32 grid-cols-6 items-end gap-3">{data.subscriptions_by_month.map((month) => { const max = Math.max(...data.subscriptions_by_month.map((entry) => Number(entry.count)), 1); return <div key={month.month} className="flex h-full flex-col items-center justify-end gap-2"><div title={`${month.count} subscriptions`} className="w-full max-w-12 rounded-t-md bg-emerald-500/85" style={{ height: `${Math.max(5, Number(month.count) / max * 100)}%` }} /><span className="text-[10px] text-slate-400">{month.month}</span></div>; })}</div>
         </section>
       </div>
     </>
